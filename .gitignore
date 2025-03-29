@@ -63,6 +63,6 @@ static/devan5hu-bedrock-user_accessKeys.csv
 
 # Environment variables
 .env
-.env.*
 *.env
+.env.*
 config.ini 

@@ -84,7 +84,8 @@ def initialize_bedrock_client():
             
         # Try loading credentials
         try:
-            access_key_id, secret_access_key = load_aws_credentials(CSV_KEY_PATH)
+            access_key_id = os.environ.get("AWS_ACCESS_KEY_ID")
+            secret_access_key = os.environ.get("AWS_SECRET_ACCESS_KEY")
             logger.info(f"AWS credentials loaded successfully: Access Key ID: {access_key_id[:5]}...")
         except Exception as e:
             logger.error(f"Failed to load AWS credentials: {str(e)}")
