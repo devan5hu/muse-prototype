@@ -1,0 +1,68 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+.env
+.venv
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Application specific
+uploads/
+*.log
+
+# Credentials and secrets
+*.pem
+*.key
+*_accessKeys.csv
+*credentials*.json
+*credential*.json
+*secret*.json
+*secrets*.json
+*config*.json
+*api_key*
+*apikey*
+*token*
+*password*
+*auth*
+static/devan5hu-bedrock-user_accessKeys.csv
+
+# Environment variables
+.env
+.env.*
+*.env
+config.ini 
