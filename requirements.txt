@@ -1,9 +1,34 @@
 flask==2.0.1
 flask-cors==3.0.10
-google-cloud-aiplatform
-vertexai==1.71.1
 Werkzeug==2.0.1
-gunicorn
+gunicorn==20.1.0
+
+# Environment variables
+python-dotenv
+
+# HTTP requests
+requests==2.31.0
+
+# Image processing
 Pillow
-dotenv
-requests
+
+# Google Cloud services
+google-cloud-aiplatform
+vertexai
+
+# AWS SDK (if you're using AWS services)
+boto3
+
+# File handling and utilities
+python-magic
+pydub
+
+# JSON handling
+jsonschema
+
+# Date/time handling
+python-dateutil
+
+# For working with video files
+moviepy
+scikit-learn
