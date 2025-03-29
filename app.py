@@ -5,7 +5,9 @@ import os
 from werkzeug.utils import secure_filename
 from app.views.twelvelabs_routes import twelvelabs_bp
 from app import create_app
+import dotenv
 
+dotenv.load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -23,7 +25,7 @@ app = create_app()
 # Configure CORS properly
 CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+        "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "https://67e7c87e9879df0035944485--peaceful-bonbon-e63768.netlify.app"],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type", "Authorization"]
     }

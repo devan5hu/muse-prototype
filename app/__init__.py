@@ -17,7 +17,7 @@ def create_app(config_class=Config):
     # Initialize extensions with more explicit CORS settings
     CORS(app, resources={
         r"/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000"],
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "https://67e7c87e9879df0035944485--peaceful-bonbon-e63768.netlify.app"],
             "methods": ["GET", "POST", "OPTIONS"],
             "allow_headers": ["Content-Type", "Authorization"]
         }
