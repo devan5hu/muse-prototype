@@ -39,11 +39,15 @@ def create_app(config_class=Config):
     from app.views.titan_routes import titan_bp
     from app.views.twelvelabs_routes import twelvelabs_bp
     from app.views.azure_routes import azure_bp
+    from app.views.cohere_routes import cohere_bp
+    from app.views.voyage_routes import voyage_bp
     
     app.register_blueprint(test_bp)
     app.register_blueprint(titan_bp)
     app.register_blueprint(twelvelabs_bp, url_prefix='/twelvelabs')
     app.register_blueprint(azure_bp)
+    app.register_blueprint(cohere_bp)
+    app.register_blueprint(voyage_bp)
     
     # Register error handlers
     from app.utils.helpers import handle_404_error, handle_413_error

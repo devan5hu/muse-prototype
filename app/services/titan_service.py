@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 # Configuration
 AWS_REGION = "ap-southeast-2"  # Titan Multimodal is available here
-CSV_KEY_PATH = "static/devan5hu-bedrock-user_accessKeys.csv"
 
 # Initialize client at module level
 bedrock_client = None
