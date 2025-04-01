@@ -17,16 +17,39 @@ COHERE_API_KEY = os.getenv("COHERE_API_KEY")
 co = cohere.ClientV2(COHERE_API_KEY)
 
 def image_to_base64(file_path):
-    """Convert image to base64 data URI, handling PNG palette mode."""
-    with open(file_path, 'rb') as image_file:
-        img = Image.open(image_file)
-        if img.mode == 'P':  # Convert palette mode to RGB
+    """Convert image to base64 data URI following Cohere's requirements."""
+    try:
+        # Open the image file directly with PIL
+        img = Image.open(file_path)
+        print(f"Original image: format={img.format}, mode={img.mode}, size={img.size}")
+        
+        # Convert to RGB if needed
+        if img.mode not in ('RGB'):
             img = img.convert('RGB')
-        img.thumbnail((256, 256))  # Resize to 256x256
-        buffer = io.BytesIO()
-        img.save(buffer, format="JPEG", quality=85)
-        base64_image = base64.b64encode(buffer.getvalue()).decode("utf-8")
-        return f"data:image/jpeg;base64,{base64_image}"  # Return as data URI
+            print(f"Converted image to RGB mode")
+        
+        # Resize if needed
+        if max(img.size) > 1024:
+            img.thumbnail((1024, 1024))
+            print(f"Resized image to {img.size}")
+        
+        # Save as JPEG (Cohere documentation specifically mentions JPEG)
+        output_buffer = io.BytesIO()
+        img.save(output_buffer, format="JPEG", quality=95)
+        output_buffer.seek(0)
+        
+        # Get raw bytes and encode to base64
+        img_bytes = output_buffer.getvalue()
+        base64_str = base64.b64encode(img_bytes).decode('utf-8')
+        
+        # Format exactly as Cohere expects
+        data_uri = f"data:image/jpeg;base64,{base64_str}"
+        print(f"Created base64 data URI with length: {len(data_uri)}")
+        
+        return data_uri
+    except Exception as e:
+        print(f"Error processing image {file_path}: {str(e)}")
+        raise Exception(f"Failed to process image: {str(e)}")
 
 def run_embedding_request(images=None, texts=None, result_queue=None):
     """Run the Cohere embedding request and store the result in a queue."""
@@ -47,44 +70,90 @@ def run_embedding_request(images=None, texts=None, result_queue=None):
             result_queue.put(("error", str(e)))
         raise e
 
-def get_cohere_embedding(image_path, max_retries=3, request_timeout=10):
-    """Generate embedding with a manual 10-second timeout and retry."""
-    base64_image = image_to_base64(image_path)
-    print(f"Converted {image_path} to base64 (length: {len(base64_image)} characters)")
-    
-    for attempt in range(max_retries):
-        print(f"Attempting API call (Attempt {attempt + 1}/{max_retries})...")
-        result_queue = queue.Queue()
-        thread = threading.Thread(target=run_embedding_request, args=([base64_image], None, result_queue))
+def get_cohere_embedding(image_path):
+    """Generate embedding for an image using Cohere API."""
+    try:
+        # Check if file exists
+        if not os.path.exists(image_path):
+            raise FileNotFoundError(f"Image file not found: {image_path}")
         
-        thread.start()
-        thread.join(timeout=request_timeout)  # Wait up to 10 seconds
+        # Try direct file upload approach first
+        try:
+            print(f"Trying direct file upload approach with {image_path}")
+            
+            # Read the file as binary
+            with open(image_path, 'rb') as f:
+                file_bytes = f.read()
+            
+            # Get file info
+            file_size = len(file_bytes)
+            print(f"File size: {file_size} bytes")
+            
+            # Create a temporary file with a known good extension
+            temp_path = image_path
+
+            print(f"Converting image to {temp_path}")
+            
+            # Convert to a known good format
+            with Image.open(image_path) as img:
+                if img.mode != 'RGB':
+                    img = img.convert('RGB')
+                img.save(temp_path, format='JPEG', quality=95)
+            
+            print(f"Saved converted image to {temp_path}")
+            
+            # Read the converted file
+            with open(temp_path, 'rb') as f:
+                converted_bytes = f.read()
+            
+            # Generate embedding with the converted file
+            response = co.embed(
+                texts=None,
+                images=[converted_bytes],
+                model="embed-english-v3.0",
+                input_type="image",
+                embedding_types=["float"]
+            )
+            
+            # Clean up temp file
+            try:
+                os.remove(temp_path)
+            except:
+                pass
+                
+            # Extract embedding
+            embedding = np.array(response.embeddings.float_[0])
+            return embedding
+            
+        except Exception as direct_error:
+            print(f"Direct file approach failed: {str(direct_error)}")
+            print("Falling back to base64 approach...")
+            
+            # Fall back to base64 approach
+            base64_uri = image_to_base64(image_path)
+            
+            response = co.embed(
+                texts=None,
+                images=[base64_uri],
+                model="embed-english-v3.0",
+                input_type="image",
+                embedding_types=["float"]
+            )
+            
+            # Extract embedding
+            embedding = np.array(response.embeddings.float_[0])
+            return embedding
+            
+    except Exception as e:
+        print(f"Error generating Cohere embedding: {str(e)}")
+        # Try to provide more details about the image
+        try:
+            with Image.open(image_path) as img:
+                print(f"Image details: format={img.format}, mode={img.mode}, size={img.size}")
+        except Exception as img_error:
+            print(f"Could not get image details: {str(img_error)}")
         
-        if thread.is_alive():
-            # If thread is still running after 10 seconds, assume timeout
-            print(f"Request took longer than {request_timeout} seconds.")
-            if attempt < max_retries - 1:
-                print(f"Retrying in 10 seconds... (Attempt {attempt + 1}/{max_retries})")
-                continue
-            else:
-                raise Exception(f"Failed after {max_retries} retries: Request exceeded {request_timeout} seconds")
-        
-        # Thread finished within 10 seconds, get the result
-        status, result = result_queue.get()
-        if status == "success":
-            print("API call succeeded.")
-            return result
-        else:
-            print(f"API error: {result}")
-            if "rate limit" in str(result).lower() or "429" in str(result):
-                if attempt < max_retries - 1:
-                    wait_time = 5 * (2 ** attempt)
-                    print(f"Rate Limit Error: Retrying in {wait_time} seconds... (Attempt {attempt + 1}/{max_retries})")
-                    sleep(wait_time)
-                else:
-                    raise Exception(f"Failed after {max_retries} retries due to rate limit: {result}")
-            else:
-                raise Exception(f"API failed: {result}")
+        raise Exception(f"API failed: {str(e)}")
 
 def get_text_embedding(text, max_retries=3, request_timeout=10):
     """Generate text embedding with timeout and retry."""

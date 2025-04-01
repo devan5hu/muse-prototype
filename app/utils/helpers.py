@@ -34,9 +34,9 @@ def create_cors_response(response=None, status=200):
         response, status = response
         
     response = make_response(response, status)
-    response.headers.add('Access-Control-Allow-Origin', '*')  # For development, allow all origins
-    # For production, you might want to be more specific:
-    # response.headers.add('Access-Control-Allow-Origin', 'https://67e7c87e9879df0035944485--peaceful-bonbon-e63768.netlify.app')
+    # Use '*' for development or specific origins for production
+    response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
     return response 

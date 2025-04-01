@@ -4,7 +4,8 @@ import numpy as np
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from app.services.cohere_service import get_cohere_embedding, search_images, get_text_embedding, cosine_similarity
-from app.utils.helpers import allowed_file
+from app.utils.helpers import allowed_file, create_cors_response, handle_options_request
+from PIL import Image
 
 cohere_bp = Blueprint('cohere', __name__)
 
@@ -55,11 +56,20 @@ def embed_image():
     
     return jsonify({'error': 'File type not allowed'}), 400
 
-@cohere_bp.route('/api/cohere/search', methods=['POST'])
+@cohere_bp.route('/api/cohere/search', methods=['POST', 'OPTIONS'])
 def search():
     """Search for similar images using Cohere embeddings from a static JSON file."""
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return handle_options_request()
+    
     query = None
     query_image_path = None
+    image_weight = 0.5  # Default weight for image similarity
+    
+    print(f"Request content type: {request.content_type}")
+    print(f"Request form: {request.form}")
+    print(f"Request files: {request.files}")
     
     # Check if the request contains form data or JSON
     if request.content_type and 'multipart/form-data' in request.content_type:
@@ -69,11 +79,26 @@ def search():
         
         # If an image was uploaded, save it temporarily
         if query_image and query_image.filename:
-            filename = secure_filename(query_image.filename)
+            # Print image details for debugging
+            print(f"Received image: {query_image.filename}, content_type: {query_image.content_type}")
+            
+            # Ensure the upload folder exists
             upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
             os.makedirs(upload_folder, exist_ok=True)
+            
+            # Save with original extension to preserve format
+            filename = secure_filename(query_image.filename)
             query_image_path = os.path.join(upload_folder, filename)
             query_image.save(query_image_path)
+            
+            print(f"Saved image to: {query_image_path}")
+            
+            # Verify the saved file
+            try:
+                with Image.open(query_image_path) as img:
+                    print(f"Saved image details: format={img.format}, mode={img.mode}, size={img.size}")
+            except Exception as e:
+                print(f"Error verifying saved image: {str(e)}")
     else:
         # Handle JSON data
         data = request.json
@@ -128,7 +153,6 @@ def search():
         
         # Compute similarities
         results = []
-        image_weight = 0.6  # Weight for image similarity vs text similarity
         
         # Handle different JSON structures
         embeddings = []
@@ -231,11 +255,13 @@ def search():
                 'similarity': result['similarity']
             })
         
-        return jsonify({
+        result = {
             'success': True,
             'formatted_images': formatted_images,
-            'similar_images': formatted_images  # Providing both formats for compatibility
-        })
+            'similar_images': formatted_images
+        }
+        
+        return create_cors_response(result)
         
     except Exception as e:
         import traceback

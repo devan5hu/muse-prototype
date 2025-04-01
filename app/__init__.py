@@ -14,14 +14,27 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
     
-    # Initialize extensions with more explicit CORS settings
+    # Configure CORS - we'll use only one method for consistency
+    # Option 1: Use Flask-CORS extension (recommended for most cases)
     CORS(app, resources={
         r"/*": {
-            "origins": ["http://localhost:3000", "http://127.0.0.1:3000", "https://67e7c87e9879df0035944485--peaceful-bonbon-e63768.netlify.app"],
+            "origins": ["http://localhost:3000", "http://127.0.0.1:3000", 
+                       "https://peaceful-bonbon-e63768.netlify.app", 
+                       "https://*.netlify.app"],
             "methods": ["GET", "POST", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"]
+            "allow_headers": ["Content-Type", "Authorization"],
+            "supports_credentials": True
         }
     })
+    
+    # Option 2: Use after_request handler (comment out Option 1 if using this)
+    # @app.after_request
+    # def apply_cors_headers(response):
+    #     response.headers.add('Access-Control-Allow-Origin', 'https://peaceful-bonbon-e63768.netlify.app')
+    #     response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
+    #     response.headers.add('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+    #     response.headers.add('Access-Control-Allow-Credentials', 'true')
+    #     return response
     
     # Create upload directory if it doesn't exist
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)

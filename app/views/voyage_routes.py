@@ -4,13 +4,17 @@ import numpy as np
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from app.services.voyage_service import get_voyage_embedding, cosine_similarity
-from app.utils.helpers import allowed_file
+from app.utils.helpers import allowed_file, create_cors_response, handle_options_request
 
 voyage_bp = Blueprint('voyage', __name__)
 
-@voyage_bp.route('/api/voyage/search', methods=['POST'])
+@voyage_bp.route('/api/voyage/search', methods=['POST', 'OPTIONS'])
 def search():
     """Search for similar images using Voyage embeddings from a static JSON file."""
+    # Handle preflight OPTIONS request
+    if request.method == 'OPTIONS':
+        return handle_options_request()
+    
     query_text = None
     query_image_path = None
     image_weight = 0.4  # Default weight for image similarity
@@ -172,12 +176,14 @@ def search():
                 'similarity': result['similarity']
             })
         
-        return jsonify({
+        result = {
             'success': True,
             'formatted_images': formatted_images,
             'similar_images': formatted_images,
-            'image_weight': image_weight  # Include the image weight in the response
-        })
+            'image_weight': image_weight
+        }
+        
+        return create_cors_response(result)
         
     except Exception as e:
         import traceback
