@@ -35,7 +35,7 @@ scikit-learn
 twelvelabs
 
 # Add Cohere client library
-cohere==4.37
+cohere
 
 # Add Voyage AI client library
-voyageai==0.1.5
+voyageai
