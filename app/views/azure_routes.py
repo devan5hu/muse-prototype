@@ -6,7 +6,7 @@ import numpy as np
 from flask import Blueprint, request
 from app.services.azure_service import AzureService
 from app.utils.helpers import save_uploaded_file, get_file_url, create_cors_response
-from app.utils.s3_helper import upload_file_to_s3, get_s3_url_without_params, generate_presigned_url
+from app.utils.s3_helper import upload_file_to_s3
 
 logger = logging.getLogger(__name__)
 azure_bp = Blueprint('azure', __name__)
@@ -194,19 +194,6 @@ def search_images():
         # Format results for frontend
         similar_images = []
         for i, (url, similarity) in enumerate(zip(result_urls, similarities)):
-            # If it's an S3 URL, generate a new presigned URL with longer expiration
-            if 's3.amazonaws.com' in url:
-                # Extract bucket and key from the URL
-                clean_url = get_s3_url_without_params(url)
-                parts = clean_url.replace('https://', '').split('/')
-                bucket = parts[0].split('.')[0]  # Extract bucket name
-                key = '/'.join(parts[1:])  # Extract object key
-                
-                # Generate a new presigned URL with 1 week expiration
-                new_url = generate_presigned_url(bucket, key, expiration=604800)  # 7 days
-                if new_url:
-                    url = new_url
-            
             similar_images.append({
                 "rank": i + 1,
                 "url": url,
