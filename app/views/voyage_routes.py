@@ -3,14 +3,15 @@ import json
 import numpy as np
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
-from app.services.voyage_service import get_voyage_embedding, cosine_similarity
+from app.services.voyage_service import get_voyage_embedding
 from app.utils.helpers import allowed_file, create_cors_response, handle_options_request
+from PIL import Image
 
 voyage_bp = Blueprint('voyage', __name__)
 
 @voyage_bp.route('/api/voyage/search', methods=['POST', 'OPTIONS'])
 def search():
-    """Search for similar images using Voyage embeddings from a static JSON file."""
+    """Search for similar images using Voyage embeddings from a static pickle file."""
     # Handle preflight OPTIONS request
     if request.method == 'OPTIONS':
         return handle_options_request()
@@ -18,7 +19,7 @@ def search():
     query_text = None
     query_image_path = None
     image_weight = 0.4  # Default weight for image similarity
-    
+    img = None 
     # Debug the incoming request
     print(f"Request content type: {request.content_type}")
     
@@ -40,12 +41,22 @@ def search():
         
         # If an image was uploaded, save it temporarily
         if query_image and query_image.filename:
+            # Print image details for debugging
+            print(f"Received image: {query_image.filename}, content_type: {query_image.content_type}")
+            
             filename = secure_filename(query_image.filename)
             upload_folder = os.path.join(current_app.config['UPLOAD_FOLDER'], 'temp')
             os.makedirs(upload_folder, exist_ok=True)
             query_image_path = os.path.join(upload_folder, filename)
             query_image.save(query_image_path)
             print(f"Saved image to: {query_image_path}")
+            
+            # Verify the saved file
+            try:
+                img = Image.open(query_image_path)
+                print(f"Image details: format={img.format}, mode={img.mode}, size={img.size}")
+            except Exception as e:
+                print(f"Error verifying saved image: {str(e)}")
     else:
         # Handle JSON data
         data = request.json
@@ -66,13 +77,14 @@ def search():
     if not query_text and not query_image_path:
         return jsonify({'error': 'No query text or image provided'}), 400
     
-    # Load pre-computed embeddings from static JSON file
-    embeddings_file = os.path.join(current_app.root_path, 'static', 'json', 'voyage.json')
+    # Load pre-computed embeddings from static pickle file
+    import pickle
+    embeddings_file = os.path.join(current_app.root_path, 'static', 'json', 'emb_selected_images.pkl')
     
     # Try alternative paths if the file is not found
-    alt_path1 = os.path.join('static', 'json', 'voyage.json')
-    alt_path2 = os.path.join(os.getcwd(), 'static', 'json', 'voyage.json')
-    alt_path3 = os.path.join(os.getcwd(), 'app', 'static', 'json', 'voyage.json')
+    alt_path1 = os.path.join('static', 'json', 'emb_selected_images.pkl')
+    alt_path2 = os.path.join(os.getcwd(), 'static', 'json', 'emb_selected_images.pkl')
+    alt_path3 = os.path.join(os.getcwd(), 'app', 'static', 'json', 'emb_selected_images.pkl')
     
     # Try to find the file in multiple locations
     if os.path.exists(embeddings_file):
@@ -87,21 +99,31 @@ def search():
         return jsonify({'error': f'Embeddings file not found. Tried: {embeddings_file}, {alt_path1}, {alt_path2}, {alt_path3}'}), 404
     
     try:
-        with open(embeddings_path, 'r') as f:
-            stored_data = json.load(f)
+        # Load pickle file
+        with open(embeddings_path, 'rb') as f:
+            stored_data = pickle.load(f)
         
         # Print structure for debugging
-        print(f"JSON structure: {type(stored_data)}")
+        print(f"Pickle structure: {type(stored_data)}")
         if isinstance(stored_data, dict):
             print(f"Keys: {stored_data.keys()}")
         
         # Generate embedding for the query
-        query_embedding = get_voyage_embedding(
-            text=query_text, 
-            image_path=query_image_path
-        )
+        query_embedding = None
+        if query_text and query_image_path:
+            # Both text and image
+            query_embedding = get_voyage_embedding(text=query_text, img=img)
+        elif query_image_path:
+            # Only image
+            query_embedding = get_voyage_embedding(img=img)
+        elif query_text:
+            # Only text
+            query_embedding = get_voyage_embedding(text=query_text)
         
-        # Handle different JSON structures
+        # Compute similarities
+        results = []
+        
+        # Handle different data structures
         embeddings = []
         image_paths = []
         
@@ -110,25 +132,12 @@ def search():
                 # Format: {"embeddings": [...], "image_paths": [...]}
                 embeddings = stored_data['embeddings']
                 image_paths = stored_data['image_paths']
-            elif 'items' in stored_data:
-                # Format: {"items": [{"embedding": [...], "image_path": "..."}, ...]}
-                for item in stored_data['items']:
-                    if 'embedding' in item and 'image_path' in item:
-                        embeddings.append(item['embedding'])
-                        image_paths.append(item['image_path'])
-        elif isinstance(stored_data, list):
-            # Format: [{"embedding": [...], "image_path": "..."}, ...]
-            for item in stored_data:
-                if isinstance(item, dict) and 'embedding' in item and 'image_path' in item:
-                    embeddings.append(item['embedding'])
-                    image_paths.append(item['image_path'])
+            elif 'emb' in stored_data and 'paths' in stored_data:
+                # Alternative format
+                embeddings = stored_data['emb']
+                image_paths = stored_data['paths']
         
-        if not embeddings or len(embeddings) == 0:
-            return jsonify({'error': 'No embeddings found in the file'}), 404
-        
-        # Compute similarities
-        results = []
-        
+        # Compute similarity for each embedding
         for idx, embedding_item in enumerate(embeddings):
             if idx >= len(image_paths):
                 break
@@ -143,14 +152,6 @@ def search():
             try:
                 similarity = float(np.dot(query_array, embedding_array) / 
                                  (np.linalg.norm(query_array) * np.linalg.norm(embedding_array)))
-                
-                # Apply image weight if this is a multimodal query
-                if query_text and query_image_path:
-                    # This is a combined query, so we apply the weight
-                    # We don't have separate text and image similarities, so we can't apply the weight directly
-                    # But we can adjust the final similarity score based on the weight preference
-                    pass
-                    
             except Exception as e:
                 print(f"Error computing similarity: {e}")
                 similarity = 0.0

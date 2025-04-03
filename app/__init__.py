@@ -58,7 +58,7 @@ def create_app(config_class=Config):
     app.register_blueprint(test_bp)
     app.register_blueprint(titan_bp)
     app.register_blueprint(twelvelabs_bp, url_prefix='/twelvelabs')
-    app.register_blueprint(azure_bp)
+    app.register_blueprint(azure_bp, url_prefix='/azure')
     app.register_blueprint(cohere_bp)
     app.register_blueprint(voyage_bp)
     
