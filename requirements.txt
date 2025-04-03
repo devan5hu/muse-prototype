@@ -45,16 +45,3 @@ voyageai
 numpy
 
 # Update requirements.txt to remove invalid entry and add any missing dependencies
-
-import os
-import pickle
-import json
-import logging
-import numpy as np
-from flask import Blueprint, request
-from app.services.azure_service import AzureService
-from app.utils.helpers import save_uploaded_file, get_file_url, create_cors_response
-from app.utils.s3_helper import upload_file_to_s3
-
-# Remove the invalid 'pickle' entry - pickle is part of Python's standard library
-# Make sure numpy is included for array operations
